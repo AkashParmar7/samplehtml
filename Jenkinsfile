@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         REPO_URL = 'https://github.com/AkashParmar7/samplehtml.git'
-        IMAGE_NAME = 'yourdockerhubusername/html-page'
+        IMAGE_NAME = 'akashparmar/html-page'  // Replace with your actual DockerHub username
         TAG = 'latest'
     }
 
@@ -17,7 +17,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("${IMAGE_NAME}:${TAG}")
+                    sh "docker build -t ${IMAGE_NAME}:${TAG} ."
                 }
             }
         }
@@ -26,9 +26,9 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
                     script {
-                        docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-                            docker.image("${IMAGE_NAME}:${TAG}").push()
-                        }
+                        sh "echo ${PASSWORD} | docker login -u ${USERNAME} --password-stdin"
+                        sh "docker push ${IMAGE_NAME}:${TAG}"
+                        sh "docker logout"
                     }
                 }
             }
@@ -37,9 +37,7 @@ pipeline {
         stage('Deploy Docker Container') {
             steps {
                 script {
-                    // Stop and remove any running container with same name
                     sh "docker rm -f html-container || true"
-                    // Run the new container
                     sh "docker run -d -p 8080:80 --name html-container ${IMAGE_NAME}:${TAG}"
                 }
             }
