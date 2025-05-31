@@ -1,40 +1,54 @@
 pipeline {
     agent any
 
+    environment {
+        REPO_URL = 'https://github.com/AkashParmar7/samplehtml.git'
+        IMAGE_NAME = 'yourdockerhubusername/html-page'
+        TAG = 'latest'
+    }
+
     stages {
-        stage('Checkout') {
+        stage('Clone HTML Code') {
             steps {
-                echo 'Cloning Repository...'
-                checkout scm
+                git url: "${REPO_URL}"
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
-                echo 'No build needed for static HTML. Skipping build step.'
+                script {
+                    docker.build("${IMAGE_NAME}:${TAG}")
+                }
             }
         }
 
-        stage('Test') {
+        stage('Push to Docker Hub') {
             steps {
-                echo 'You can add HTML validation tools here (e.g., htmlhint).'
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                    script {
+                        docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
+                            docker.image("${IMAGE_NAME}:${TAG}").push()
+                        }
+                    }
+                }
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy Docker Container') {
             steps {
-                echo 'Deploying static site...'
-                // You can copy to an S3 bucket, or deploy to a web server
+                script {
+                    // Stop and remove any running container with same name
+                    sh "docker rm -f html-container || true"
+                    // Run the new container
+                    sh "docker run -d -p 8080:80 --name html-container ${IMAGE_NAME}:${TAG}"
+                }
             }
         }
     }
 
     post {
-        success {
-            echo 'Pipeline completed successfully!'
-        }
-        failure {
-            echo 'Pipeline failed.'
+        always {
+            echo "Pipeline completed"
         }
     }
 }
